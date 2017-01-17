@@ -1,11 +1,58 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
     <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=0, minimum-scale=1, maximum-scale=1">
-        <title>Procedurally generate your world</title>
+        <title>WebGL - Planet</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+
+        <style>
+            body {
+                color: #000;
+                font-family:Monospace;
+                font-size:13px;
+                text-align:center;
+                font-weight: bold;
+                background-color: #fff;
+                margin: 0px;
+                overflow: hidden;
+            }
+            a {
+                color: red;
+            }
+        </style>
+
+        <script src="js/libs/three.min.js"></script>
+        <script src="js/libs/jquery-3.1.1.min.js"></script>
+        <script src="js/libs/dat.gui.min.js"></script>
+        <script src="js/controls/OrbitControls.js"></script>
+
+
+
     </head>
+
     <body>
-        <script src="public/bundle.js"></script>
+        <div id="containerScene"></div>
+
+        
+        <script data-src="./shaders/planet_vertex.glsl" data-name="planetShader" type="x-shader/x-vertex"></script>
+        <script data-src="./shaders/planet_fragment.glsl" data-name="planetShader" type="x-shader/x-fragment"></script>
+
+        <script data-src="./shaders/ocean_vertex.glsl" data-name="oceanShader" type="x-shader/x-vertex"></script>
+        <script data-src="./shaders/ocean_fragment.glsl" data-name="oceanShader" type="x-shader/x-fragment"></script>
+
+        <script data-src="./shaders/clouds_vertex.glsl" data-name="cloudsShader" type="x-shader/x-vertex"></script>
+        <script data-src="./shaders/clouds_fragment.glsl" data-name="cloudsShader" type="x-shader/x-fragment"></script>
+
+        <script data-src="./shaders/noise/classicnoise3D.glsl" data-name="perlinNoise" type="x-shader/x-vertex"></script>
+        <script data-src="./shaders/noise/cellular3D.glsl" data-name="cellularNoise" type="x-shader/x-vertex"></script>
+
+
+
+        <script src="./js/libs/ShaderLoader.js"></script>
+        <script src="./js/main.js"></script>
+
     </body>
+
+
+
 </html>
