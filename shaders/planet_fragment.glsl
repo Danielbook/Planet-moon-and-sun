@@ -7,7 +7,7 @@ uniform vec3 surfaceColor;
 uniform vec3 lightPos;
 uniform vec3 cameraPos;
 uniform vec3 shoreColor;
-uniform float avTemp;
+uniform float avgTemp;
 
 void main() {
   vec3 snowColor = vec3(0.8, 0.9, 1.0);
@@ -17,7 +17,7 @@ void main() {
   float kd = 0.6;
   float ka = 0.4;
 
-  float shoreLineTop = mountAmp/8.0+avTemp-7.0;
+  float shoreLineTop = mountAmp/8.0+avgTemp-7.0;
 
   shoreLineTop = max(shoreLineTop, 3.0);
 
@@ -25,7 +25,7 @@ void main() {
   vec3 finalColor=mix(sandColor, surfaceColor, smoothstep(0.0, shoreLineTop, noise));
 
   // Snow on peaks
-  finalColor=mix(finalColor, snowColor, smoothstep(avTemp, avTemp+7.0, noise));
+  finalColor=mix(finalColor, snowColor, smoothstep(avgTemp, avgTemp+7.0, noise));
 
   // Low freq noise
   finalColor=finalColor-0.04*pnoise(1.0*pos, vec3(10.0));

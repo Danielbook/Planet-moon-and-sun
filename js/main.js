@@ -1,11 +1,11 @@
 let camera, controls, scene, renderer;
-let planetMaterial, oceanMaterial, moonMaterial;
+let sunMaterial, planetMaterial, oceanMaterial, atmosphereMaterial, moonMaterial;
 let startTime = new Date().getTime();
 let runTime = 0;
 
 let moonOrbit;
 
-let planet, ocean;
+let planet, atmosphere, ocean, moon;
 
 const RADIUS = 100;
 const SEGMENTS = 128;
@@ -31,10 +31,13 @@ controls.enableRotate = true;
 controls.rotateSpeed = 0.05;
 
 // Lights
-light = new THREE.DirectionalLight(0xffffff);
-light.position.set(1000, 1000, 1000);
+light = new THREE.SpotLight( 0xFFAA55 );
 light.castShadow = true;
+light.position.set(300, 300, 300);
 scene.add(light);
+
+var helper = new THREE.CameraHelper( light.shadow.camera );
+scene.add( helper );
 
 window.addEventListener('resize', onWindowResize, false);
 
@@ -44,7 +47,7 @@ let sharedUniforms = {
   cameraPos:    {type: 'v3', value: camera.position},
   oceanLevel:   {type: 'f', value: 1.0},
   time:         {type: 'f', value: 0.0},
-  avTemp:       {type: 'f', value: 7.0},
+  avgTemp:       {type: 'f', value: 7.0},
   planetRadius: {type: 'f', value: RADIUS},
 };
 
@@ -58,9 +61,14 @@ let planetUniforms = Object.assign({}, sharedUniforms, {
 );
 
 let oceanUniforms = Object.assign({}, sharedUniforms, {
-    oceanColor: {type: 'v3', value: [0.0, 0.0, 1.0]}
+    oceanColor: {type: 'v3', value: [0, 11/255, 255/255]}
   }
 );
+
+let atmosphereUniforms = Object.assign({}, sharedUniforms, {
+  atmosphereHeight: {type: 'f', value: 18},
+  atmosphereOpacity: {type: 'f', value: 0.6}
+});
 
 let moonUniforms = Object.assign({}, sharedUniforms, {
     surfaceColor: {type: 'v3', value: [0.8, 0.8, 0.8]},
@@ -87,11 +95,12 @@ function initWorld() {
     new THREE.SphereGeometry(RADIUS, SEGMENTS, RINGS), oceanMaterial);
   scene.add(ocean);
 
-  let sunMaterial = new THREE.MeshBasicMaterial();
+  atmosphere = new THREE.Mesh(new THREE.SphereGeometry(RADIUS, SEGMENTS, RINGS), atmosphereMaterial);
+  scene.add(atmosphere);
 
   let sun = new THREE.Mesh(
     new THREE.SphereGeometry(RADIUS, SEGMENTS, RINGS), sunMaterial);
-  sun.position.set(1000.0, 1000.0, 1000.0); //Set position the same as the light position
+  sun.position.set(300.0, 300.0, 300.0); //Set position the same as the light position
   scene.add(sun);
 
   addStars();
@@ -102,17 +111,29 @@ function initWorld() {
 function loadShaders() {
   SHADER_LOADER.load(
     function (data) {
+      let sunVShader = data.sunShader.vertex;
+      let sunFShader = data.sunShader.fragment;
+
       let planetVShader = data.planetShader.vertex;
       let planetFShader = data.planetShader.fragment;
 
       let moonVShader = data.moonShader.vertex;
       let moonFShader = data.moonShader.fragment;
 
+      let atmosphereVShader = data.atmosphereShader.vertex;
+      let atmosphereFShader = data.atmosphereShader.fragment;
+
       let oceanVShader = data.oceanShader.vertex;
       let oceanFShader = data.oceanShader.fragment;
 
       let classicNoise3D = data.perlinNoise.vertex;
       let cellNoise3D = data.cellularNoise.vertex;
+
+      sunMaterial = new THREE.ShaderMaterial({
+        uniforms:       sharedUniforms,
+        vertexShader:   classicNoise3D + sunVShader,
+        fragmentShader: classicNoise3D + sunFShader,
+      });
 
       planetMaterial = new THREE.ShaderMaterial({
         uniforms:       planetUniforms,
@@ -124,6 +145,14 @@ function loadShaders() {
         uniforms:       moonUniforms,
         vertexShader:   classicNoise3D + moonVShader,
         fragmentShader: classicNoise3D + moonFShader,
+      });
+
+      atmosphereMaterial = new THREE.ShaderMaterial({
+        uniforms:       atmosphereUniforms,
+        vertexShader:   classicNoise3D + atmosphereVShader,
+        fragmentShader: classicNoise3D + atmosphereFShader,
+        side: THREE.DoubleSide,
+        transparent: true
       });
 
       oceanMaterial = new THREE.ShaderMaterial({
@@ -140,7 +169,7 @@ function loadShaders() {
 
 function displayGUI() {
   let gui = new dat.GUI();
-  let jar;
+  let newValue;
 
   // Setup initial values for controls
   let parameters = {
@@ -149,13 +178,15 @@ function displayGUI() {
       planetUniforms.surfaceColor.value[2] * 255],
     mountFreq: planetUniforms.mountFreq.value,
     mountAmp:  planetUniforms.mountAmp.value,
-    avgTemp:   sharedUniforms.avTemp.value,
+    avgTemp:   sharedUniforms.avgTemp.value,
     oceColor:  [oceanUniforms.oceanColor.value[0] * 255,     // surface color
       oceanUniforms.oceanColor.value[1] * 255,
       oceanUniforms.oceanColor.value[2] * 255],
     shoColor:  [planetUniforms.shoreColor.value[0] * 255,     // surface color
       planetUniforms.shoreColor.value[1] * 255,
       planetUniforms.shoreColor.value[2] * 255],
+    atmosphereHeight: atmosphereUniforms.atmosphereHeight.value,
+    atmosphereOpacity: atmosphereUniforms.atmosphereOpacity.value,
     moonSpeed:  moonUniforms.moonSpeed.value,
     moonMountFreq: moonUniforms.moonMountFreq.value,
     moonMountAmp: moonUniforms.moonMountAmp.value,
@@ -172,6 +203,8 @@ function displayGUI() {
   let temperature = surfaceFolder.add(parameters, 'avgTemp').min(-12.0).max(35).step(0.01).name('Temperature');
   let mountainFrequency = surfaceFolder.add(parameters, 'mountFreq').min(0.02).max(0.1).step(0.001).name('Mount freq');
   let mountainAmplitide = surfaceFolder.add(parameters, 'mountAmp').min(2.0).max(30).step(0.01).name('Mount amp');
+  let atmosphereHeight = surfaceFolder.add(parameters, 'atmosphereHeight').min(5.0).max(30.0).step(0.1).name('Atm. height');
+  let atmosphereOpacity = surfaceFolder.add(parameters, 'atmosphereOpacity').min(0.0).max(1.0).step(0.01).name('Atm. opacity');
 
   // Ocean controls
   let ocenFolder = gui.addFolder('Ocean');
@@ -189,52 +222,60 @@ function displayGUI() {
   let moonMountainFrequency = moonFolder.add(parameters, 'moonMountFreq').min(0.1).max(0.5).step(0.001).name('Mount freq');
   let moonMountainAmplitide = moonFolder.add(parameters, 'moonMountAmp').min(2.0).max(10).step(0.01).name('Mount amp');
 
-  planetColor.onChange(function (jar) {
-    planetUniforms.surfaceColor.value[0] = jar[0] / 255;
-    planetUniforms.surfaceColor.value[1] = jar[1] / 255;
-    planetUniforms.surfaceColor.value[2] = jar[2] / 255;
+  planetColor.onChange(function (newValue) {
+    planetUniforms.surfaceColor.value[0] = newValue[0] / 255;
+    planetUniforms.surfaceColor.value[1] = newValue[1] / 255;
+    planetUniforms.surfaceColor.value[2] = newValue[2] / 255;
   });
 
-  shoreColor.onChange(function (jar) {
-    planetUniforms.shoreColor.value[0] = jar[0] / 255;
-    planetUniforms.shoreColor.value[1] = jar[1] / 255;
-    planetUniforms.shoreColor.value[2] = jar[2] / 255;
+  shoreColor.onChange(function (newValue) {
+    planetUniforms.shoreColor.value[0] = newValue[0] / 255;
+    planetUniforms.shoreColor.value[1] = newValue[1] / 255;
+    planetUniforms.shoreColor.value[2] = newValue[2] / 255;
   });
 
-  moonColor.onChange(function (jar) {
-    moonUniforms.surfaceColor.value[0] = jar[0] / 255;
-    moonUniforms.surfaceColor.value[1] = jar[1] / 255;
-    moonUniforms.surfaceColor.value[2] = jar[2] / 255;
+  moonColor.onChange(function (newValue) {
+    moonUniforms.surfaceColor.value[0] = newValue[0] / 255;
+    moonUniforms.surfaceColor.value[1] = newValue[1] / 255;
+    moonUniforms.surfaceColor.value[2] = newValue[2] / 255;
   });
 
-  mountainFrequency.onChange(function (jar) {
-    planetUniforms.mountFreq.value = jar;
+  temperature.onChange(function (newValue) {
+    sharedUniforms.avgTemp.value = newValue;
   });
 
-  mountainAmplitide.onChange(function (jar) {
-    planetUniforms.mountAmp.value = jar;
+  atmosphereOpacity.onChange(function (newValue) {
+    atmosphereUniforms.atmosphereOpacity.value = newValue;
   });
 
-  moonMountainFrequency.onChange(function (jar) {
-    moonUniforms.moonMountFreq.value = jar;
+  mountainFrequency.onChange(function (newValue) {
+    planetUniforms.mountFreq.value = newValue;
   });
 
-  moonMountainAmplitide.onChange(function (jar) {
-    moonUniforms.moonMountAmp.value = jar;
+  mountainAmplitide.onChange(function (newValue) {
+    planetUniforms.mountAmp.value = newValue;
   });
 
-  temperature.onChange(function (jar) {
-    sharedUniforms.avTemp.value = jar;
+  atmosphereHeight.onChange(function (newValue) {
+    atmosphereUniforms.atmosphereHeight.value = newValue;
   });
 
-  oceanColor.onChange(function (jar) {
-    oceanUniforms.oceanColor.value[0] = jar[0] / 255;
-    oceanUniforms.oceanColor.value[1] = jar[1] / 255;
-    oceanUniforms.oceanColor.value[2] = jar[2] / 255;
+  moonMountainFrequency.onChange(function (newValue) {
+    moonUniforms.moonMountFreq.value = newValue;
   });
 
-  moonSpeedControl.onChange(function (jar) {
-    moonUniforms.moonSpeed.value = jar;
+  moonMountainAmplitide.onChange(function (newValue) {
+    moonUniforms.moonMountAmp.value = newValue;
+  });
+
+  oceanColor.onChange(function (newValue) {
+    oceanUniforms.oceanColor.value[0] = newValue[0] / 255;
+    oceanUniforms.oceanColor.value[1] = newValue[1] / 255;
+    oceanUniforms.oceanColor.value[2] = newValue[2] / 255;
+  });
+
+  moonSpeedControl.onChange(function (newValue) {
+    moonUniforms.moonSpeed.value = newValue;
   });
 }
 
@@ -266,7 +307,7 @@ function addStars() {
 
 
 function addMoon() {
-  let moon = new THREE.Mesh(new THREE.SphereGeometry(MOONRADIUS, SEGMENTS, RINGS), moonMaterial);
+  moon = new THREE.Mesh(new THREE.SphereGeometry(MOONRADIUS, SEGMENTS, RINGS), moonMaterial);
 
   moon.castShadow = true;
   moon.receiveShadow = true;
@@ -276,13 +317,13 @@ function addMoon() {
   scene.add( moonOrbit );
 
   // pivots
-  var pivot1 = new THREE.Object3D();
-  pivot1.rotation.z = 0;
-  moonOrbit.add( pivot1 );
+  var pivot = new THREE.Object3D();
+  pivot.rotation.z = 0;
+  moonOrbit.add( pivot );
 
   // mesh
   moon.position.set(0.0, 150, 100.0);
-  pivot1.add( moon );
+  pivot.add( moon );
 }
 
 function onWindowResize() {
