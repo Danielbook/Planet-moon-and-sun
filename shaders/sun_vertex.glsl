@@ -3,16 +3,12 @@ uniform float time;
 varying vec3 vNormal;
 varying vec3 pos;
 varying float noise;
-varying float noise2;
 
 void main() {
-	noise = 5.0*pnoise(0.005*time*position, vec3(4.0));
-
-    noise2 = 10.0*pnoise(0.02*time*position, vec3(10.0));
-
+	noise = 150.0 * pnoise(0.0001 * (time) * vec3(0.9, 0.26, 0.56) * position, vec3(200.0));
 
 	// Apply elevation in normal 
-    pos = position + noise*normal*noise2;
+    pos = position + noise * normal;
 
     vNormal = normal;
 

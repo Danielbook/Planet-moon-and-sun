@@ -18,10 +18,11 @@ renderer = new THREE.WebGLRenderer({antialias: true});
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap; // default THREE.PCFShadowMap
 
 let container = document.getElementById('containerScene');
 container.appendChild(renderer.domElement);
-camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 5000);
+camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 5000000);
 camera.position.z = 500;
 controls = new THREE.OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
@@ -31,13 +32,18 @@ controls.enableRotate = true;
 controls.rotateSpeed = 0.05;
 
 // Lights
-light = new THREE.SpotLight( 0xFFAA55 );
+let light = new THREE.DirectionalLight( 0xFFAA55, 1, 100 );
+light.position.set(250, 250, 250);
 light.castShadow = true;
-light.position.set(300, 300, 300);
 scene.add(light);
 
-var helper = new THREE.CameraHelper( light.shadow.camera );
-scene.add( helper );
+light.shadow.mapSize.width = 512;  // default
+light.shadow.mapSize.height = 512; // default
+light.shadow.camera.near = 0.5;    // default
+light.shadow.camera.far = 1000;    // default
+
+// let helper = new THREE.CameraHelper( light.shadow.camera );
+// scene.add( helper );
 
 window.addEventListener('resize', onWindowResize, false);
 
@@ -99,8 +105,8 @@ function initWorld() {
   scene.add(atmosphere);
 
   let sun = new THREE.Mesh(
-    new THREE.SphereGeometry(RADIUS, SEGMENTS, RINGS), sunMaterial);
-  sun.position.set(300.0, 300.0, 300.0); //Set position the same as the light position
+    new THREE.SphereGeometry(RADIUS*100, SEGMENTS, RINGS), sunMaterial);
+  sun.position.set(10000.0, 10000.0, 10000.0); //Set position the same as the light position
   scene.add(sun);
 
   addStars();
@@ -131,8 +137,8 @@ function loadShaders() {
 
       sunMaterial = new THREE.ShaderMaterial({
         uniforms:       sharedUniforms,
-        vertexShader:   classicNoise3D + sunVShader,
-        fragmentShader: classicNoise3D + sunFShader,
+        vertexShader:   cellNoise3D + classicNoise3D + sunVShader,
+        fragmentShader: cellNoise3D + classicNoise3D + sunFShader,
       });
 
       planetMaterial = new THREE.ShaderMaterial({
@@ -143,7 +149,7 @@ function loadShaders() {
 
       moonMaterial = new THREE.ShaderMaterial({
         uniforms:       moonUniforms,
-        vertexShader:   classicNoise3D + moonVShader,
+        vertexShader:   cellNoise3D + classicNoise3D + moonVShader,
         fragmentShader: classicNoise3D + moonFShader,
       });
 
@@ -218,8 +224,8 @@ function displayGUI() {
   moonFolder.open();
 
   let moonColor = moonFolder.addColor(parameters, 'moonSurClr').name('Surface Color');
-  let moonSpeedControl = moonFolder.add(parameters, 'moonSpeed').min(0.001).max(0.1).step(0.001).name('Moon speed');
-  let moonMountainFrequency = moonFolder.add(parameters, 'moonMountFreq').min(0.1).max(0.5).step(0.001).name('Mount freq');
+  let moonSpeedControl = moonFolder.add(parameters, 'moonSpeed').min(0.0).max(0.1).step(0.001).name('Moon speed');
+  let moonMountainFrequency = moonFolder.add(parameters, 'moonMountFreq').min(0.1).max(0.3).step(0.0001).name('Mount freq');
   let moonMountainAmplitide = moonFolder.add(parameters, 'moonMountAmp').min(2.0).max(10).step(0.01).name('Mount amp');
 
   planetColor.onChange(function (newValue) {

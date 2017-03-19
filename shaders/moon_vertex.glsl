@@ -3,13 +3,16 @@ uniform float moonMountAmp;
 
 varying vec3 vNormal;
 varying vec3 pos;
-varying float noise;
+varying vec2 noise;
+varying vec2 noise2;
 
 void main() {
-	noise = moonMountAmp*pnoise(moonMountFreq*position, vec3(50.0));
+	//noise = moonMountAmp*pnoise(moonMountFreq*position, vec3(50.0));
+
+	noise = moonMountAmp*cellular(moonMountFreq*position);
 
 	// Apply elevation in normal 
-    pos = position + noise*normal;
+    pos = position + noise.x*normal;
 
     vNormal = normal;
 

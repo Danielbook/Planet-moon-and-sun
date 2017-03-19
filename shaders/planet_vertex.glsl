@@ -7,7 +7,7 @@ varying vec3 pos;
 varying float noise;
 
 void main() {
-	noise = mountAmp*pnoise(mountFreq*position+vec3(0.2, 0.34, 0.52), vec3(250.0));
+	noise = mountAmp*pnoise(mountFreq*position+vec3(0.2, 0.34, 0.52), vec3(20.0));
 
 	// Apply elevation in normal 
     pos = position + noise*normal;
